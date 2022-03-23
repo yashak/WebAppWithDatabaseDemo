@@ -59,33 +59,33 @@ stages:
     #   displayName: Scan Nuget Packages
     #   enabled: ${{ parameters.runCompletePipeline }}
 
-    - task: PowerShell@2
-      displayName: Prepare for Sonar Cloud
-      enabled: ${{ parameters.runCompletePipeline }}
-      inputs:
-        targetType: 'inline'
-        script: |
-          $paths = Get-ChildItem -include *.csproj -Recurse
-                foreach($pathobject in $paths) 
-                {
-                    $path = $pathobject.fullname
-                    $doc = New-Object System.Xml.XmlDocument
-                    $doc.Load($path)
-                    $child = $doc.CreateElement("ProjectGuid")
-                    $child.InnerText = [guid]::NewGuid().ToString().ToUpper()
-                    $node = $doc.SelectSingleNode("//Project/PropertyGroup")
-                    $node.AppendChild($child)
-                    $doc.Save($path)
-                }
-        workingDirectory: 'WebApp'
+    # - task: PowerShell@2
+    #   displayName: Prepare for Sonar Cloud
+    #   enabled: ${{ parameters.runCompletePipeline }}
+    #   inputs:
+    #     targetType: 'inline'
+    #     script: |
+    #       $paths = Get-ChildItem -include *.csproj -Recurse
+    #             foreach($pathobject in $paths) 
+    #             {
+    #                 $path = $pathobject.fullname
+    #                 $doc = New-Object System.Xml.XmlDocument
+    #                 $doc.Load($path)
+    #                 $child = $doc.CreateElement("ProjectGuid")
+    #                 $child.InnerText = [guid]::NewGuid().ToString().ToUpper()
+    #                 $node = $doc.SelectSingleNode("//Project/PropertyGroup")
+    #                 $node.AppendChild($child)
+    #                 $doc.Save($path)
+    #             }
+    #     workingDirectory: 'WebApp'
 
-    - task: SonarCloudPrepare@1
-      displayName: Prepare analysis on SonarCloud
-      enabled: ${{ parameters.runCompletePipeline }}
-      inputs:
-        SonarCloud: SonarCloud
-        organization: houssemdellai
-        projectKey: WebAppWithDatabaseDemo
+    # - task: SonarCloudPrepare@1
+    #   displayName: Prepare analysis on SonarCloud
+    #   enabled: ${{ parameters.runCompletePipeline }}
+    #   inputs:
+    #     SonarCloud: SonarCloud
+    #     organization: houssemdellai
+    #     projectKey: WebAppWithDatabaseDemo
 
     - task: DotNetCoreCLI@2
       displayName: Build WebApp
@@ -109,13 +109,13 @@ stages:
         arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)'
         zipAfterPublish: True
 
-    - task: SonarCloudAnalyze@1
-      displayName: Run Code Analysis
-      enabled: ${{ parameters.runCompletePipeline }}
+    # - task: SonarCloudAnalyze@1
+    #   displayName: Run Code Analysis
+    #   enabled: ${{ parameters.runCompletePipeline }}
 
-    - task: SonarCloudPublish@1
-      displayName: Publish Quality Gate Result
-      enabled: ${{ parameters.runCompletePipeline }}
+    # - task: SonarCloudPublish@1
+    #   displayName: Publish Quality Gate Result
+    #   enabled: ${{ parameters.runCompletePipeline }}
 
     - task: PublishBuildArtifacts@1
       displayName: Publish Artifact (WebApp.zip)
