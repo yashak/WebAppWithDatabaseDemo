@@ -15,9 +15,6 @@ trigger:
    exclude:
      - docs/*
      - README.md
-     - 01_azure-pipelines-ci.yml
-     - 02_azure-pipelines-ci.yml
-     - 03_azure-pipelines-ci-cd.yml
      - 001_azure-pipelines-ci.yml
      - 002_azure-pipelines-ci.yml
      - 003_azure-pipelines-ci-cd.yml
