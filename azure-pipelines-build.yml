@@ -1,0 +1,178 @@
+pr:
+  branches:
+    include:
+      - dev
+  paths:
+    exclude:
+      - docs/*
+      - README.md
+
+trigger:
+ branches:
+   include:
+     - master
+ paths:
+   exclude:
+     - docs/*
+     - README.md
+     - 001_azure-pipelines-ci.yml
+     - 002_azure-pipelines-ci.yml
+     - 003_azure-pipelines-ci-cd.yml
+
+parameters:
+- name: runCompletePipeline
+  displayName: Run All Tasks ?
+  type: boolean
+  default: true
+
+stages:
+- stage: Build_Stage
+  displayName: Build Apps
+  jobs:
+
+  - job: WebApp
+    displayName: Build Web App
+    pool:
+      name: Hosted Windows 2019 with VS2019 
+      vmImage: 'windows-2019'
+    variables:
+      BuildConfiguration: release
+    steps:
+
+    - task: UseDotNet@2
+      displayName: Install .NET 6 sdk
+      inputs:
+        packageType: sdk
+        version: 6.0.x
+        installationPath: $(Agent.ToolsDirectory)/dotnet
+
+    - task: DotNetCoreCLI@2
+      displayName: Restore Nuget Packages
+      inputs:
+        command: restore
+        projects: '**/WebApp.csproj'
+    
+    # - task: WhiteSource Bolt@20
+    #   displayName: Scan Nuget Packages
+    #   enabled: ${{ parameters.runCompletePipeline }}
+
+    # - task: PowerShell@2
+    #   displayName: Prepare for Sonar Cloud
+    #   enabled: ${{ parameters.runCompletePipeline }}
+    #   inputs:
+    #     targetType: 'inline'
+    #     script: |
+    #       $paths = Get-ChildItem -include *.csproj -Recurse
+    #             foreach($pathobject in $paths) 
+    #             {
+    #                 $path = $pathobject.fullname
+    #                 $doc = New-Object System.Xml.XmlDocument
+    #                 $doc.Load($path)
+    #                 $child = $doc.CreateElement("ProjectGuid")
+    #                 $child.InnerText = [guid]::NewGuid().ToString().ToUpper()
+    #                 $node = $doc.SelectSingleNode("//Project/PropertyGroup")
+    #                 $node.AppendChild($child)
+    #                 $doc.Save($path)
+    #             }
+    #     workingDirectory: 'WebApp'
+
+    # - task: SonarCloudPrepare@1
+    #   displayName: Prepare analysis on SonarCloud
+    #   enabled: ${{ parameters.runCompletePipeline }}
+    #   inputs:
+    #     SonarCloud: SonarCloud
+    #     organization: houssemdellai
+    #     projectKey: WebAppWithDatabaseDemo
+
+    - task: DotNetCoreCLI@2
+      displayName: Build WebApp
+      inputs:
+        projects: '**/WebApp.csproj'
+        arguments: '--configuration $(BuildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      displayName: Run Unit Tests
+      enabled: ${{ parameters.runCompletePipeline }}
+      inputs:
+        command: test
+        projects: '**/*UnitTest*.csproj'
+        arguments: '--configuration $(BuildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      displayName: Create WebApp.zip
+      inputs:
+        command: publish
+        publishWebProjects: True
+        arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)'
+        zipAfterPublish: True
+
+    # - task: SonarCloudAnalyze@1
+    #   displayName: Run Code Analysis
+    #   enabled: ${{ parameters.runCompletePipeline }}
+
+    # - task: SonarCloudPublish@1
+    #   displayName: Publish Quality Gate Result
+    #   enabled: ${{ parameters.runCompletePipeline }}
+
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Artifact (WebApp.zip)
+      inputs:
+        PathtoPublish: '$(build.artifactstagingdirectory)'
+        ArtifactName: drop
+
+  - job: Database
+    displayName: Build Database
+    pool:
+      vmImage: 'windows-2019'
+      demands: msbuild
+    steps:
+
+    - task: MSBuild@1
+      displayName: Build WebApp.Database.sqlproj
+      inputs:
+        solution: WebApp.Database/WebApp.Database.sqlproj
+        msbuildArguments: '/p:OutDir=$(Build.ArtifactStagingDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Artifact (Dacpac)
+      inputs:
+        ArtifactName: dacpac
+
+  - job: Selenium
+    displayName: Build UI Tests
+    pool:
+      vmImage: 'windows-2019'
+      demands: msbuild
+
+    steps:
+    - task: NuGetToolInstaller@0
+      displayName: Use NuGet 4.3.0
+
+    - task: NuGetCommand@2
+      displayName: Restoore NuGet Packages
+      inputs:
+        restoreSolution: WebAppWithDatabase.sln
+
+    - task: MSBuild@1
+      displayName: Build SeleniumUiTests.csproj
+      inputs:
+        solution: SeleniumUiTests/SeleniumUiTests.csproj
+        msbuildArguments: '/p:OutDir=$(Build.ArtifactStagingDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: UI-Test'
+      inputs:
+        ArtifactName: ui-tests
+
+  - job: Infrastructure
+    displayName: Publish Infra files
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: ARM templates'
+      inputs:
+        PathtoPublish: AzureResourceGroupDeployment
+        ArtifactName: arm
+
